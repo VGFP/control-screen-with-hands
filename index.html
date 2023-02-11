@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Hand tracking using HandTrack.js</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/handtrackjs/dist/handtrack.min.js"></script>
+  </head>
+  <body>
+    <div style="position: relative">
+      <video id="video" width="640" height="480" autoplay></video>
+      <canvas
+        id="canvas"
+        width="640"
+        height="480"
+        style="position: absolute; top: 0; left: 0"
+      ></canvas>
+      <div
+        id="gesture"
+        style="position: absolute; top: 20px; left: 20px; font-size: 24px"
+      ></div>
+      <canvas
+        id="myCanvas"
+        width="640"
+        height="480"
+        style="border: 1px solid black"
+      ></canvas>
+    </div>
+    <div>
+      <h3>Click on a button by moving a coursor using open hand and  close hand to 'click' (note: only one hand is used for controling the coursor)</h3>
+    </div>
+    <script>
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("canvas");
+      const gesture = document.getElementById("gesture");
+      const defaultParams = {
+        flipHorizontal: true,
+        outputStride: 16,
+        imageScaleFactor: 1,
+        maxNumBoxes: 20,
+        iouThreshold: 0.2,
+        scoreThreshold: 0.6,
+        modelType: "ssd640fpnlite",
+        modelSize: "large",
+        bboxLineWidth: "2",
+        fontSize: 17,
+      };
+
+      let model = null;
+
+      handTrack.load(defaultParams).then((lmodel) => {
+        model = lmodel;
+      });
+
+      navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+        video.srcObject = stream;
+        setInterval(runDetection, 100);
+      });
+
+      // Get the canvas element and context
+      const menu_canvas = document.getElementById("myCanvas");
+      const ctx = menu_canvas.getContext("2d");
+
+      // Button settings
+      const boxWidth = 150;
+      const boxHeight = 80;
+      const boxX = (canvas.width - boxWidth) / 2;
+      const boxY = (canvas.height - boxHeight) / 2;
+
+      // Define a function to draw the circle at a given position
+      function drawCircle(x, y) {
+        // Draw a white circle with a dark gray stroke
+        ctx.fillStyle = "white";
+        ctx.strokeStyle = "darkgray";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      var circlePos = [50, 50];
+      drawCircle(circlePos[0], circlePos[1]);
+
+      function drawButton(x, y, width, height, text) {
+        ctx.fillStyle = "white";
+        ctx.strokeStyle = "darkgray";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.rect(x, y, width, height);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "black";
+        ctx.font = "20px Arial";
+        ctx.fillText(text, x + width / 2 - 40, y + height / 2 + 10);
+      }
+
+      drawButton(boxX, boxY, boxWidth, boxHeight, "Click ME!");
+
+      function isPointInsideBox() {
+        // Check if the point is inside the box
+        if (
+          circlePos[0] >= boxX &&
+          circlePos[0] <= boxX + boxWidth &&
+          circlePos[1] >= boxY &&
+          circlePos[1] <= boxY + boxHeight
+        ) {
+          return true;
+        } else {
+          return false;
+        }
+      }
+      // If detected gesture changes from open to closed it is a click
+      function clickOnCanvas(x, y) {
+        if (isPointInsideBox()) {
+          window.location.href = "clicked.html";
+        }
+      }
+
+      // Define a function to update the position of the circle
+      function updateCircle(targetX, targetY, x, y) {
+        // Calculate the distance between the current position and the target position
+        const dx = targetX - x;
+        const dy = targetY - y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // If the circle is not at the target position, update its position
+        if (distance > 1) {
+          // Calculate the new position of the circle
+          x += dx * 0.1;
+          y += dy * 0.1;
+
+          // Clear the canvas
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          drawButton(boxX, boxY, boxWidth, boxHeight, "Click ME!");
+
+          // Draw the circle at the new position
+          drawCircle(x, y);
+
+          // Request the next animation frame
+          requestAnimationFrame(updateCircle);
+
+          return [x, y];
+        }
+      }
+
+      function controlMouse(targetX, targetY) {
+        const [x, y] = circlePos;
+        const dx = targetX - x;
+        const dy = targetY - y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance > 1) {
+          const [newX, newY] = updateCircle(targetX, targetY, x, y);
+
+          circlePos = [newX, newY];
+        }
+      }
+
+      function getBoxMiddlePoint(x, y, width, height) {
+        const middleX = x + width / 2;
+        const middleY = y + height / 2;
+        return [middleX, middleY];
+      }
+
+      function runDetection() {
+        model.detect(video).then((predictions) => {
+          let control_bool = true;
+          if (predictions.length > 0) {
+            gesture.innerHTML = "";
+            for (let i = 0; i < predictions.length; i++) {
+              const bbox = predictions[i].bbox;
+              const x = bbox[0];
+              const y = bbox[1];
+              const width = bbox[2];
+              const height = bbox[3];
+              const gestureString = predictions[i].label;
+              if (gestureString === "open") {
+                canvas
+                  .getContext("2d")
+                  .clearRect(0, 0, canvas.width, canvas.height);
+                canvas.getContext("2d").strokeStyle = "#FF0000";
+                // canvas.getContext("2d").strokeRect(x, y, width, height);
+                canvas
+                  .getContext("2d")
+                  .strokeRect(canvas.width - (x + width), y, width, height);
+                if (control_bool) {
+                  control_bool = false;
+                  [targetX, targetY] = getBoxMiddlePoint(
+                    canvas.width - (x + width),
+                    y,
+                    width,
+                    height
+                  );
+                  controlMouse(targetX, targetY);
+                }
+              }
+              if (gestureString === "closed") {
+                if (control_bool) {
+                  control_bool = false;
+                  [targetX, targetY] = getBoxMiddlePoint(
+                    canvas.width - (x + width),
+                    y,
+                    width,
+                    height
+                  );
+                  clickOnCanvas(targetX, targetY);
+              }
+            }
+            gesture.innerHTML += gestureString + "\n";
+          }
+          } else {
+            canvas
+              .getContext("2d")
+              .clearRect(0, 0, canvas.width, canvas.height);
+            gesture.innerHTML = "";
+          }
+        });
+      }
+    </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+      }
+    </style>
+    
+  </body>
+</html>
