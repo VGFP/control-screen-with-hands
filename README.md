@@ -1,4 +1,5 @@
 # This repository is a simple demo how to use handtracking to interact with a website.
+Check out the demo here: https://vgfp.github.io/control-screen-with-hands/
 More updates are coming soon.
 ## Used libraries
 - [Handtrack.js]
