@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+    <title>Babylon.js sample code</title>
+
+    <!-- Babylon.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+    <script src="https://assets.babylonjs.com/generated/Assets.js"></script>
+    <script src="https://preview.babylonjs.com/ammo.js"></script>
+    <script src="https://preview.babylonjs.com/cannon.js"></script>
+    <script src="https://preview.babylonjs.com/Oimo.js"></script>
+    <script src="https://preview.babylonjs.com/earcut.min.js"></script>
+    <script src="https://preview.babylonjs.com/babylon.js"></script>
+    <script src="https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+    <script src="https://preview.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+    <script src="https://preview.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+    <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+    <script src="https://preview.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+    <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+    <script src="https://preview.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/handtrackjs/dist/handtrack.min.js"></script>
+
+    <style>
+      html,
+      body {
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+
+      #handtrackCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+        width: 640px;
+        height: 480px;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="position: relative; height: 480px; width: 640px">
+      <video
+        id="video"
+        width="640"
+        height="480"
+        autoplay
+        style="position: absolute; top: 0; left: 0"
+      ></video>
+      <canvas
+        id="renderCanvas"
+        style="height: 480px; width: 640px; position: absolute; top: 0; left: 0"
+      ></canvas>
+      <canvas id="handtrackCanvas" width="1280" height="960"></canvas>
+    </div>
+    <div>
+      <h3
+        style="font-family: Arial, Helvetica, sans-serif; font-size: 20px"
+        id="info"
+      ></h3>
+      <h3
+        style="font-family: Arial, Helvetica, sans-serif; font-size: 20px"
+        id="info2"
+      ></h3>
+      <h3
+        style="font-family: Arial, Helvetica, sans-serif; font-size: 20px"
+        id="info3"
+      >
+        Use open hand to move coursor without interactions, use closed hand
+        movement to rotate a camera. NOTE: This demo handles only one hand for
+        detection.
+      </h3>
+      <button onclick="window.location.href = '../index.html';">Return</button>
+    </div>
+    <script>
+      // Babylon.js code
+      var canvas = document.getElementById("renderCanvas");
+
+      var startRenderLoop = function (engine, canvas) {
+        engine.runRenderLoop(function () {
+          if (sceneToRender && sceneToRender.activeCamera) {
+            sceneToRender.render();
+          }
+        });
+      };
+
+      var engine = null;
+      var scene = null;
+      var sceneToRender = null;
+
+      var createDefaultEngine = function () {
+        return new BABYLON.Engine(canvas, true, {
+          preserveDrawingBuffer: true,
+          stencil: true,
+          disableWebGL2Support: false,
+        });
+      };
+
+      var createScene = function () {
+        // Create basic world
+        var scene = new BABYLON.Scene(engine);
+        // This creates and positions an ArcRotateCamera
+        var camera = new BABYLON.ArcRotateCamera(
+          "camera1",
+          Math.PI / 3,
+          Math.PI / 3,
+          10,
+          BABYLON.Vector3.Zero(),
+          scene
+        );
+        camera.setTarget(BABYLON.Vector3.Zero());
+        camera.attachControl(canvas, true);
+
+        var light = new BABYLON.HemisphericLight(
+          "light1",
+          new BABYLON.Vector3(0, 1, 0),
+          scene
+        );
+        var ground = BABYLON.Mesh.CreateGround("ground1", 6, 6, 2, scene);
+        ground.position.y = -1;
+
+        scene.onPointerObservable.add(function (pointerInfo) {
+          if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN) {
+            // handle pointer down event
+            console.log("pointer down");
+          } else if (
+            pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE
+          ) {
+            // handle pointer move event
+            console.log("pointer move");
+            console.log(pointerInfo);
+            console.log(
+              "x: " +
+                pointerInfo.event.event.movementX +
+                " y: " +
+                pointerInfo.event.event.movementY
+            );
+            // Handle pointer move event
+            if (pointerInfo.event.event.movementX > 0) {
+              if (pointerInfo.event.event.movementY > 0) {
+                camera.alpha += 0.01;
+                camera.beta += 0.01;
+              } else {
+                camera.alpha += 0.01;
+                camera.beta -= 0.01;
+              }
+            }
+            if (pointerInfo.event.event.movementX < 0) {
+              if (pointerInfo.event.event.movementY > 0) {
+                camera.alpha -= 0.01;
+                camera.beta += 0.01;
+              } else {
+                camera.alpha -= 0.01;
+                camera.beta -= 0.01;
+              }
+            }
+          } else if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERUP) {
+            // handle pointer up event
+            console.log("pointer up");
+          }
+        });
+
+        BABYLON.SceneLoader.LoadAssetContainer(
+          "https://models.babylonjs.com/",
+          "seagulf.glb",
+          scene,
+          function (container) {
+            // Create the 3D UI manager
+            var manager = new BABYLON.GUI.GUI3DManager(scene);
+
+            // Add loaded file to the scene
+            container.addAllToScene();
+
+            // Scale and position the loaded model (First mesh loaded from gltf is the root node)
+            container.meshes[0].scaling.scaleInPlace(0.002);
+
+            // wrap in bounding box mesh to avoid picking perf hit
+            var gltfMesh = container.meshes[0];
+            var boundingBox =
+              BABYLON.BoundingBoxGizmo.MakeNotPickableAndWrapInBoundingBox(
+                gltfMesh
+              );
+          }
+        );
+
+        return scene;
+      };
+
+      window.initFunction = async function () {
+        var asyncEngineCreation = async function () {
+          try {
+            return createDefaultEngine();
+          } catch (e) {
+            console.log(
+              "the available createEngine function failed. Creating the default engine instead"
+            );
+            return createDefaultEngine();
+          }
+        };
+
+        window.engine = await asyncEngineCreation();
+        if (!engine) throw "engine should not be null.";
+        startRenderLoop(engine, canvas);
+        window.scene = createScene();
+      };
+      initFunction().then(() => {
+        sceneToRender = scene;
+      });
+
+      // Resize
+      window.addEventListener("resize", function () {
+        engine.resize();
+      });
+
+      //   Handtracking logic
+      var lastDetectedGesture = "open";
+      var prevMousePos = { x: 0, y: 0 };
+      const handtrackCanvas = document.getElementById("handtrackCanvas");
+      const video = document.getElementById("video");
+
+      const info = document.getElementById("info");
+      const info2 = document.getElementById("info2");
+
+      const defaultParams = {
+        flipHorizontal: true,
+        outputStride: 16,
+        imageScaleFactor: 1,
+        maxNumBoxes: 20,
+        iouThreshold: 0.2,
+        scoreThreshold: 0.6,
+        modelType: "ssd640fpnlite",
+        modelSize: "large",
+        bboxLineWidth: "2",
+        fontSize: 17,
+      };
+      let model = null;
+      handTrack.load(defaultParams).then((lmodel) => {
+        model = lmodel;
+      });
+
+      navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+        video.srcObject = stream;
+        setInterval(runDetection, 100);
+      });
+      const ctx = handtrackCanvas.getContext("2d");
+
+      function drawCircle(x, y, color) {
+        // Draw a white circle with a dark gray stroke
+        ctx.fillStyle = color;
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(2 * x, 2 * y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      var circlePos = [50, 50, "rgba(255, 255, 255, 0.3)"];
+      drawCircle(circlePos[0], circlePos[1], circlePos[2]);
+
+      // Define a function to update the position of the circle
+      function updateCircle(targetX, targetY, x, y) {
+        // Calculate the distance between the current position and the target position
+        const dx = targetX - x;
+        const dy = targetY - y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // If the circle is not at the target position, update its position
+        if (distance > 1) {
+          // Calculate the new position of the circle
+          x += dx * 0.1;
+          y += dy * 0.1;
+
+          // Clear the canvas
+          ctx.clearRect(0, 0, handtrackCanvas.width, handtrackCanvas.height);
+
+          // Draw the circle at the new position
+          drawCircle(x, y, circlePos[2]);
+
+          // Request the next animation frame
+          requestAnimationFrame(updateCircle);
+
+          return [x, y];
+        }
+      }
+
+      function runDetection() {
+        model.detect(video).then((predictions) => {
+          info2.innerText = "Predictions: ";
+          let control_bool = true;
+          if (predictions.length > 0) {
+            for (let i = 0; i < predictions.length; i++) {
+              const gestureString = predictions[i].label;
+              info2.innerText += " " + gestureString + " ";
+              if (gestureString === "open" || gestureString === "closed") {
+                if (!control_bool) {
+                  continue;
+                }
+                control_bool = false;
+                const bbox = predictions[i].bbox;
+                const x = bbox[0];
+                const y = bbox[1];
+                const width = bbox[2];
+                const height = bbox[3];
+                [targetX, targetY] = getBoxMiddlePoint(
+                  handtrackCanvas.width - (x + width),
+                  y,
+                  width,
+                  height
+                );
+                handtrackController(gestureString, x, y);
+              }
+            }
+          } else {
+            circlePos[2] = "rgba(255, 255, 255, 0.3)";
+            drawCircle(circlePos[0], circlePos[1], circlePos[2]);
+          }
+        });
+      }
+
+      function getBoxMiddlePoint(x, y, width, height) {
+        const middleX = x + width / 2;
+        const middleY = y + height / 2;
+        return [middleX, middleY];
+      }
+
+      // Function to controll handtracking. If current gesture is the same as the last detected gesture, and it is 'close' run moveMouse event. If new gestuire is 'open' and prev was 'close' run mouseUp event. If new gesture is 'closed' and prev was 'open' run mouseDown event.
+      function handtrackController(gesture, x, y) {
+        info.innerText = "Gesture: " + lastDetectedGesture;
+        if (lastDetectedGesture === gesture) {
+          if (gesture === "closed") {
+            moveMouseClicked(x, y);
+          }
+          if (gesture === "open") {
+            mouseMove(x, y);
+          }
+        } else if (lastDetectedGesture === "open" && gesture === "closed") {
+          mouseClick(x, y);
+          lastDetectedGesture = gesture;
+        } else if (lastDetectedGesture === "closed" && gesture === "open") {
+          mouseUp(x, y);
+          lastDetectedGesture = gesture;
+        } else {
+          lastDetectedGesture = gesture;
+        }
+      }
+
+      function mouseUp(targetX, targetY) {
+        var pointerUpEvent = new BABYLON.PointerInfo(
+          BABYLON.PointerEventTypes.POINTERUP,
+          {
+            pointerId: 1,
+            pointerType: BABYLON.PointerEventTypes.POINTERTYPE_MOUSE,
+            event: null,
+            width: 1,
+            height: 1,
+            pickInfo: null,
+            isSynchronize: false,
+          }
+        );
+        scene.onPointerObservable.notifyObservers(pointerUpEvent);
+        mouseMove(targetX, targetY);
+      }
+
+      function mouseClick(targetX, targetY) {
+        prevMousePos.x = targetX;
+        prevMousePos.y = targetY;
+        var pointerDownEvent = new BABYLON.PointerInfo(
+          BABYLON.PointerEventTypes.POINTERDOWN,
+          {
+            pointerId: 1,
+            pointerType: BABYLON.PointerEventTypes.POINTERTYPE_MOUSE,
+            event: null,
+            width: 1,
+            height: 1,
+            pickInfo: null,
+            isSynchronize: false,
+          }
+        );
+        scene.onPointerObservable.notifyObservers(pointerDownEvent);
+        mouseMove(targetX, targetY);
+      }
+
+      function moveMouseClicked(targetX, targetY) {
+        var pointerMoveEvent = new BABYLON.PointerInfo(
+          BABYLON.PointerEventTypes.POINTERMOVE,
+          {
+            pointerId: 1,
+            pointerType: BABYLON.PointerEventTypes.POINTERTYPE_MOUSE,
+            event: {
+              movementX: targetX - prevMousePos.x,
+              movementY: targetY - prevMousePos.y,
+            },
+            width: 1,
+            height: 1,
+            pickInfo: null,
+            isSynchronize: false,
+          }
+        );
+        prevMousePos.x = targetX;
+        prevMousePos.y = targetY;
+        scene.onPointerObservable.notifyObservers(pointerMoveEvent);
+        mouseMove(targetX, targetY);
+      }
+
+      function mouseMove(targetX, targetY) {
+        const [x, y, color] = circlePos;
+        const dx = targetX - x;
+        const dy = targetY - y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance > 1) {
+          const [newX, newY] = updateCircle(targetX, targetY, x, y);
+          circlePos = [newX, newY, color];
+        }
+      }
+    </script>
+  </body>
+</html>

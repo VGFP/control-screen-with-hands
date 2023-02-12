@@ -8,5 +8,5 @@ More updates are coming soon.
 Web is not best for using handtracking as a tool for interactions with a content. Main issue is a preformance. But it also allows for touchless interactions with a content. I think it will be usefull for self-order kiosks in restaurants and smart mirrors.
 
 ## TODO
-- [ ] Add a demo that uses 3D engine like babylon.js
+- [x] Add a demo that uses 3D engine like babylon.js
 - [ ] Add a demo that incorporates handtracking with headtracking from jeelizFaceFilter
